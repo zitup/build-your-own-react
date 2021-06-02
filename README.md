@@ -32,6 +32,49 @@ function render(element, container) {
 }
 ```
 
-wipRoot 是根 fiber,
+wipRoot 是根 fiber
 
-3. 
+3. `workLoop` 会一直运行，监听是否有工作需要处理
+
+```jsx
+function workLoop(deadline) {
+  let shouldYield = false
+  while (nextUnitOfWork && !shouldYield) {
+    nextUnitOfWork = performUnitOfWork(nextUnitOfWork)
+    shouldYield = deadline.timeRemaining() < 1
+  }
+  if (!nextUnitOfWork && wipRoot) {
+    commitRoot()
+  }
+  requestIdleCallback(workLoop)
+}
+requestIdleCallback(workLoop)
+```
+
+这里为了简单，使用 requestIdleCallback 方法进行调度，React 实际使用的是 scheduler 包。
+
+4. 当 render 创建了根 fiber 时，workLoop 开始运行。进入到 `performUnitOfWork` 函数
+
+```jsx
+function performUnitOfWork(fiber) {
+  const isFunctionComponent = fiber.type instanceof Function
+  if (isFunctionComponent) {
+    updateFunctionComponent(fiber)
+  } else {
+    updateHostComponent(fiber)
+  }
+
+  if (fiber.child) {
+    return fiber.child
+  }
+  let nextFiber = fiber
+  while (nextFiber) {
+    if (nextFiber.sibling) {
+      return nextFiber.sibling
+    }
+    nextFiber = nextFiber.parent
+  }
+}
+```
+
+首先它会区分组件类型，对函数和类组件分别执行不同的函数。
